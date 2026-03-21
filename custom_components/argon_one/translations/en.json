@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Argon ONE Case Setup",
+        "description": "Select your Argon ONE case type. Make sure I2C is enabled before proceeding.",
+        "data": {
+          "case_type": "Case type"
+        }
+      }
+    },
+    "error": {
+      "i2c_not_available": "I2C bus not available. Please enable I2C and restart.",
+      "i2c_device_not_found": "Argon ONE case not detected on I2C bus. Check connection."
+    },
+    "abort": {
+      "already_configured": "Argon ONE is already configured."
+    }
+  }
+}

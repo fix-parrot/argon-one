@@ -44,17 +44,16 @@ People *love* thorough bug reports. I'm not even kidding.
 
 ## Use a Consistent Coding Style
 
-Use [black](https://github.com/ambv/black) to make sure the code follows the style.
+Use [ruff](https://github.com/astral-sh/ruff) to make sure the code follows the style.
 
 ## Test your code modification
 
-This custom component is based on [integration_blueprint template](https://github.com/ludeeus/integration_blueprint).
+The repository includes a devcontainer with a complete Home Assistant
+development environment. Open the project in VS Code and select
+**Reopen in Container** — a standalone HA instance will start with the
+included [`configuration.yaml`](./config/configuration.yaml).
 
-It comes with development environment in a container, easy to launch
-if you use Visual Studio Code. With this container you will have a stand alone
-Home Assistant instance running and already configured with the included
-[`configuration.yaml`](./config/configuration.yaml)
-file.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for the full setup guide.
 
 ## License
 

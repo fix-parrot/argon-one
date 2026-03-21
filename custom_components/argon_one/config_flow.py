@@ -1,0 +1,98 @@
+"""Config flow for Argon ONE integration."""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+import voluptuous as vol
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+
+from .const import (
+    CASE_TYPE_PI5,
+    CASE_TYPES,
+    CONF_CASE_TYPE,
+    DOMAIN,
+    I2C_ADDRESS,
+    I2C_BUS_NUMBER,
+    PI5_FAN_REGISTER,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+STEP_USER_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_CASE_TYPE): vol.In(CASE_TYPES),
+    }
+)
+
+
+def _test_i2c(case_type: str) -> str | None:
+    """
+    Test I2C bus availability and device presence.
+
+    Returns None on success or an error key string.
+    """
+    if not Path(f"/dev/i2c-{I2C_BUS_NUMBER}").exists():
+        return "i2c_not_available"
+
+    try:
+        from smbus2 import SMBus  # noqa: PLC0415
+
+        bus = SMBus(I2C_BUS_NUMBER)
+        try:
+            if case_type == CASE_TYPE_PI5:
+                bus.read_byte_data(I2C_ADDRESS, PI5_FAN_REGISTER)
+            else:
+                bus.write_byte(I2C_ADDRESS, 0)
+        finally:
+            bus.close()
+    except OSError as err:
+        _LOGGER.warning("I2C device not found at 0x%02X: %s", I2C_ADDRESS, err)
+        return "i2c_device_not_found"
+    except Exception:
+        _LOGGER.exception("Unexpected error during I2C test")
+        return "i2c_not_available"
+
+    return None
+
+
+class ArgonOneConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Argon ONE."""
+
+    VERSION = 1
+
+    async def async_step_user(
+        self,
+        user_input: dict[str, str] | None = None,
+    ) -> ConfigFlowResult:
+        """Handle the initial step."""
+        if user_input is None:
+            return self.async_show_form(
+                step_id="user",
+                data_schema=STEP_USER_DATA_SCHEMA,
+            )
+
+        await self.async_set_unique_id(DOMAIN)
+        self._abort_if_unique_id_configured()
+
+        try:
+            error = await self.hass.async_add_executor_job(
+                _test_i2c, user_input[CONF_CASE_TYPE]
+            )
+        except Exception:
+            _LOGGER.exception("Unexpected error in config flow")
+            return self.async_show_form(
+                step_id="user",
+                data_schema=STEP_USER_DATA_SCHEMA,
+                errors={"base": "i2c_not_available"},
+            )
+
+        if error is not None:
+            return self.async_show_form(
+                step_id="user",
+                data_schema=STEP_USER_DATA_SCHEMA,
+                errors={"base": error},
+            )
+
+        return self.async_create_entry(title="Argon ONE", data=user_input)

@@ -1,0 +1,41 @@
+---
+name: "Testing request"
+description: "Request testing on specific hardware configuration"
+labels: ["testing", "help wanted"]
+body:
+- type: markdown
+  attributes:
+    value: |
+      This configuration needs testing. If you have the hardware listed below, please help verify the integration works correctly.
+
+- type: dropdown
+  attributes:
+    label: Hardware configuration
+    description: "What needs to be tested"
+    options:
+      - "Argon ONE V1/V2 (Classic) + Raspberry Pi 3"
+      - "Argon ONE V1/V2 (Classic) + Raspberry Pi 4"
+      - "Argon ONE V3 + Raspberry Pi 5"
+      - "Argon ONE V5 + Raspberry Pi 5"
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "What to test"
+    description: "List of functionality that needs verification"
+    value: |
+      - [ ] Integration setup (config flow)
+      - [ ] Fan speed control (0%, 25%, 50%, 75%, 100%)
+      - [ ] Fan turn on/off
+      - [ ] Always ON switch (Classic cases only)
+      - [ ] Integration removal
+      - [ ] Behavior after Home Assistant restart
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "Additional notes"
+    description: "Any specific scenarios or edge cases to test"
+    placeholder: "e.g., test with debug logging enabled, verify fan responds correctly to temperature changes, etc."

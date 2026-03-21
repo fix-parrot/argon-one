@@ -1,18 +1,51 @@
-# artifacts
-__pycache__
-.pytest*
-*.egg-info
-*/build/*
-*/dist/*
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
 
-# misc
-.coverage
-.vscode
-coverage.xml
-.ruff_cache
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
-
-# Home Assistant configuration
+# Home Assistant
 config/*
 !config/configuration.yaml
+.storage/
+home-assistant.log
+home-assistant_v2.db
+
+# Testing
+.pytest_cache/
+.pytest*
+.coverage
+htmlcov/
+coverage.xml
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+*.zip
+
+# Temporary files
+*.tmp
+.cache/
+.ruff_cache
+
+# OS
+Thumbs.db
+
+# SDD
+specs/

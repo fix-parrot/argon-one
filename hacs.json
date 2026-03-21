@@ -1,5 +1,8 @@
 {
-    "name": "Integration blueprint",
-    "homeassistant": "2026.3.2",
-    "hacs": "2.0.5"
+    "name": "Argon ONE",
+    "homeassistant": "2026.1",
+    "hacs": "2.0.5",
+    "render_readme": true,
+    "zip_release": true,
+    "filename": "argon_one.zip"
 }
