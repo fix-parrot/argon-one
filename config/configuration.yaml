@@ -10,3 +10,23 @@ logger:
   default: info
   logs:
     custom_components.argon_one: debug
+    mock_smbus2: debug
+
+# Mock temperature sensor for preset mode testing in devcontainer
+# Use the input_number slider in the UI to change temperature,
+# the template sensor mirrors its value with device_class: temperature.
+input_number:
+  mock_temperature:
+    name: Mock Temperature
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+template:
+  - sensor:
+      - name: Mock Temperature
+        device_class: temperature
+        unit_of_measurement: "°C"
+        state: "{{ states('input_number.mock_temperature') }}"
