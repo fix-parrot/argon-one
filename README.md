@@ -10,12 +10,11 @@ Performance).
 | Case | Raspberry Pi | Fan Control | Always ON Mode | Tested |
 |---|---|---|---|---|
 | Argon ONE V1 (Classic) | Pi 3 | ✅ | ✅ (via I2C) | ❌ [Help wanted](https://github.com/fix-parrot/argon-one/issues) |
-| Argon ONE V2 (Classic) | Pi 4 | ✅ | ✅ (via I2C) | ❌ [Help wanted](https://github.com/fix-parrot/argon-one/issues) |
+| Argon ONE V2 (Classic) | Pi 4 | ✅ | ✅ (via I2C) | ✅ |
 | Argon ONE V3 | Pi 5 | ✅ | ❌ (hardware jumper) | ✅ |
 | Argon ONE V5 | Pi 5 | ✅ | ❌ (hardware jumper) | ❌ [Help wanted](https://github.com/fix-parrot/argon-one/issues) |
 
-> **Note:** The integration has only been tested on **Argon ONE V3 with
-> Raspberry Pi 5**. If you have a Classic (V1/V2) case or an Argon ONE V5,
+> **Note:** If you have a Classic (V1) case or an Argon ONE V5,
 > please check the [open issues](https://github.com/fix-parrot/argon-one/issues)
 > — your help with testing is very welcome!
 
