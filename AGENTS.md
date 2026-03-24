@@ -99,6 +99,7 @@ step. The integration is loaded by HA at runtime.
 - **Type check**: `uv run mypy custom_components/argon_one/`
 - **Format**: `uv run ruff format .`
 - **Dev server**: `scripts/develop` (starts HA with mock I2C)
+- **Deploy**: `scripts/deploy` (automated deployment to HA instances)
 - **Validate manifest**: `python -m script.hassfest --integration-path custom_components/argon_one`
   (requires HA Core dev environment)
 - **HACS validation**: `gh workflow run validate.yml` (or auto on push/PR to main)

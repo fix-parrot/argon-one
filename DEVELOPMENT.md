@@ -87,6 +87,22 @@ Use this when you need to test against real hardware.
 4. **Add the integration** — Settings → Devices & Services → Add Integration →
    search **Argon ONE** → select case type (Classic or Pi 5).
 
+### Option C: Automated deployment
+
+Deploy the integration to a remote Home Assistant instance via SSH:
+
+```bash
+./scripts/deploy                                  # default: root@homeassistant.local:2222
+./scripts/deploy root@192.168.1.100:2222          # custom host/port
+./scripts/deploy pi@ha.local                      # port defaults to 22
+```
+
+The script packs `custom_components/argon_one` with `tar`, uploads it over SSH,
+and unpacks into `/config/custom_components/` on the target.
+
+**Requirements:**
+- SSH key authentication configured for the target host
+
 ## Environment Configuration
 
 ### Dev HA config

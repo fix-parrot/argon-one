@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Deploy Argon ONE integration to a Home Assistant instance via SSH.
+# Usage: ./scripts/deploy [user@host[:port]]
+# Example: ./scripts/deploy root@homeassistant.local:22
+
+DEST="${1:-root@homeassistant.local:22}"
+DOMAIN="argon_one"
+LOCAL="./custom_components"
+REMOTE="/config/custom_components"
+
+# Parse user@host:port
+USER_HOST="${DEST%:*}"
+PORT="${DEST##*:}"
+[[ "$PORT" == "$DEST" ]] && PORT=22
+
+if [[ ! -d "$LOCAL/$DOMAIN" ]]; then
+    echo "Error: $LOCAL/$DOMAIN not found. Run from project root." >&2
+    exit 1
+fi
+
+echo "Deploying $DOMAIN → ${USER_HOST}:${PORT}:${REMOTE}/${DOMAIN}"
+
+ssh -p "$PORT" "$USER_HOST" "rm -rf '${REMOTE}/${DOMAIN}' && mkdir -p '${REMOTE}'"
+
+tar -czf - \
+    --exclude='__pycache__' \
+    --exclude='*.pyc' \
+    --exclude='.DS_Store' \
+    -C "$LOCAL" "$DOMAIN" \
+  | ssh -p "$PORT" "$USER_HOST" "tar -xzf - -C '${REMOTE}'"
+
+echo "Done. Restart HA to apply: Settings → System → Restart"
