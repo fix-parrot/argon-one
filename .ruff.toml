@@ -15,6 +15,30 @@ ignore = [
     "ISC001", # incompatible with formatter
 ]
 
+[lint.per-file-ignores]
+"tests/**" = [
+    "S101",    # assert is fine in tests
+    "SLF001",  # private member access is fine in tests
+    "TC002",   # no need for TYPE_CHECKING blocks in tests
+    "TC003",   # no need for TYPE_CHECKING blocks in tests
+    "ARG001",  # unused function arguments (fixtures)
+    "D100",    # missing docstring in public module
+    "D103",    # missing docstring in public function
+    "ANN",     # type annotations not required in tests
+    "PLR2004", # magic value comparisons
+    "ERA001",  # commented-out code used as test documentation
+    "E501",    # long lines in test comments/params
+]
+"testing/**" = [
+    "D100",   # missing docstring in public module
+    "D104",   # missing docstring in public package
+    "INP001", # implicit namespace package
+    "ANN",    # type annotations not required in mock module
+]
+"tests/__init__.py" = [
+    "D104",   # missing docstring in public package
+]
+
 [lint.flake8-pytest-style]
 fixture-parentheses = false
 
