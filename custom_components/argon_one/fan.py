@@ -22,6 +22,7 @@ from .const import (
     CONF_TEMP_SENSOR,
     DEFAULT_FAN_SPEED,
     DOMAIN,
+    HYSTERESIS_CELSIUS,
     I2C_ADDRESS,
     PI5_FAN_REGISTER,
     PRESET_CURVES,
@@ -193,18 +194,67 @@ class ArgonOneFan(FanEntity):
             )
             return
 
-        speed = self._compute_speed(self._preset_mode, temp)
+        speed = self._compute_speed(self._preset_mode, temp, self._percentage)
         await self._async_send_speed(speed)
         self._percentage = speed
         self._is_on = speed > 0
 
     @staticmethod
-    def _compute_speed(preset_mode: str, temperature: float) -> int:
-        """Return fan speed for a given preset and temperature."""
-        for threshold, speed in PRESET_CURVES[preset_mode]:
+    def _compute_speed(
+        preset_mode: str,
+        temperature: float,
+        current_speed: int | None = None,
+    ) -> int:
+        """Return fan speed for a preset curve with hysteresis."""
+        curve = PRESET_CURVES[preset_mode]
+
+        new_speed = 0
+        for threshold, speed in curve:
             if temperature >= threshold:
-                return speed
-        return 0
+                new_speed = speed
+                break
+
+        if current_speed is None or new_speed >= current_speed:
+            return new_speed
+
+        current_threshold = None
+        for threshold, speed in curve:
+            if speed == current_speed:
+                current_threshold = threshold
+                break
+
+        if current_threshold is None:
+            _LOGGER.warning(
+                "Current speed not found in curve: "
+                "preset=%s temp=%.2f current_speed=%s fallback_speed=%s",
+                preset_mode,
+                temperature,
+                current_speed,
+                new_speed,
+            )
+            return new_speed
+
+        hold_until = current_threshold - HYSTERESIS_CELSIUS
+
+        if temperature >= hold_until:
+            _LOGGER.debug(
+                "Hold fan speed: "
+                "preset=%s temp=%.2f current_speed=%s hold_until_below=%.2f",
+                preset_mode,
+                temperature,
+                current_speed,
+                hold_until,
+            )
+            return current_speed
+
+        _LOGGER.debug(
+            "Decrease fan speed: preset=%s temp=%.2f old_speed=%s new_speed=%s",
+            preset_mode,
+            temperature,
+            current_speed,
+            new_speed,
+        )
+        return new_speed
 
     # ------------------------------------------------------------------
     # I2C

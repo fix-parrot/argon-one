@@ -25,6 +25,7 @@ CONF_CASE_TYPE = "case_type"
 
 # Fan defaults
 DEFAULT_FAN_SPEED = 10
+HYSTERESIS_CELSIUS = 2.0
 
 # Options keys
 CONF_TEMP_SENSOR = "temperature_sensor"
@@ -40,7 +41,7 @@ PRESET_MODES = [PRESET_SILENT, PRESET_DEFAULT, PRESET_PERFORMANCE]
 # Evaluated top-down; first matching threshold (temp >= threshold) wins.
 # Must be sorted descending by threshold.
 PRESET_CURVES: dict[str, list[tuple[int, int]]] = {
-    PRESET_SILENT: [(75, 100), (70, 75), (65, 50), (58, 25), (50, 10), (0, 0)],
-    PRESET_DEFAULT: [(75, 100), (70, 80), (65, 60), (60, 40), (55, 25), (50, 10), (0, 0)],  # noqa: E501
+    PRESET_SILENT:      [(75, 100), (70, 75), (65, 50), (58, 25), (50, 10), (0, 0)],
+    PRESET_DEFAULT:     [(75, 100), (70, 80), (65, 60), (60, 40), (55, 25), (50, 10), (0, 0)],  # noqa: E501
     PRESET_PERFORMANCE: [(72, 100), (67, 80), (62, 60), (57, 40), (52, 25), (47, 10), (0, 0)],  # noqa: E501
 }
