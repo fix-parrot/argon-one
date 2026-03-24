@@ -4,14 +4,26 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlowWithReload,
+)
+from homeassistant.core import callback
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+)
 
 from .const import (
     CASE_TYPE_PI5,
     CASE_TYPES,
     CONF_CASE_TYPE,
+    CONF_TEMP_SENSOR,
     DOMAIN,
     I2C_ADDRESS,
     I2C_BUS_NUMBER,
@@ -62,6 +74,14 @@ class ArgonOneConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: ConfigEntry,  # noqa: ARG004
+    ) -> ArgonOneOptionsFlow:
+        """Create the options flow."""
+        return ArgonOneOptionsFlow()
+
     async def async_step_user(
         self,
         user_input: dict[str, str] | None = None,
@@ -96,3 +116,32 @@ class ArgonOneConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
         return self.async_create_entry(title="Argon ONE", data=user_input)
+
+
+class ArgonOneOptionsFlow(OptionsFlowWithReload):
+    """Handle options for Argon ONE."""
+
+    async def async_step_init(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        options_schema = vol.Schema(
+            {
+                vol.Optional(CONF_TEMP_SENSOR): EntitySelector(
+                    EntitySelectorConfig(
+                        device_class="temperature",
+                    )
+                ),
+            }
+        )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                options_schema, self.config_entry.options
+            ),
+        )
