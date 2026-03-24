@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Fan preset modes (Silent, Default, Performance) with automatic temperature-based speed control via a configurable HA sensor ([#7](https://github.com/fix-parrot/argon-one/issues/7))
+
 ## [0.1.0] - 2026-03-21
 
 ### Added
