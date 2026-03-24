@@ -25,6 +25,8 @@ from .const import (
     CONF_CASE_TYPE,
     CONF_TEMP_SENSOR,
     DOMAIN,
+    ERR_I2C_DEVICE_NOT_FOUND,
+    ERR_I2C_NOT_AVAILABLE,
     I2C_ADDRESS,
     I2C_BUS_NUMBER,
     PI5_FAN_REGISTER,
@@ -46,7 +48,7 @@ def _test_i2c(case_type: str) -> str | None:
     Returns None on success or an error key string.
     """
     if not Path(f"/dev/i2c-{I2C_BUS_NUMBER}").exists():
-        return "i2c_not_available"
+        return ERR_I2C_NOT_AVAILABLE
 
     try:
         from smbus2 import SMBus  # noqa: PLC0415
@@ -61,10 +63,10 @@ def _test_i2c(case_type: str) -> str | None:
             bus.close()
     except OSError as err:
         _LOGGER.warning("I2C device not found at 0x%02X: %s", I2C_ADDRESS, err)
-        return "i2c_device_not_found"
+        return ERR_I2C_DEVICE_NOT_FOUND
     except Exception:
         _LOGGER.exception("Unexpected error during I2C test")
-        return "i2c_not_available"
+        return ERR_I2C_NOT_AVAILABLE
 
     return None
 
@@ -105,7 +107,7 @@ class ArgonOneConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_show_form(
                 step_id="user",
                 data_schema=STEP_USER_DATA_SCHEMA,
-                errors={"base": "i2c_not_available"},
+                errors={"base": ERR_I2C_NOT_AVAILABLE},
             )
 
         if error is not None:

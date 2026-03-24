@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from homeassistant.core import Event, HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
+    from homeassistant.helpers.event import EventStateChangedData
 
     from . import ArgonOneConfigEntry
 from .const import (
@@ -166,7 +167,9 @@ class ArgonOneFan(FanEntity):
             self._unsub_sensor()
             self._unsub_sensor = None
 
-    async def _on_sensor_state_change(self, _event: Event) -> None:
+    async def _on_sensor_state_change(
+        self, _event: Event[EventStateChangedData]
+    ) -> None:
         """Handle temperature sensor state change."""
         await self._async_apply_preset()
         self.async_write_ha_state()
