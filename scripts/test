@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+uv run pytest tests/ --cov=custom_components/argon_one --cov-report=term-missing "$@"
