@@ -16,5 +16,16 @@
     "abort": {
       "already_configured": "Argon ONE is already configured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Argon ONE Options",
+        "description": "Select a temperature sensor to enable fan preset modes (Silent, Default, Performance). Leave empty to disable presets.",
+        "data": {
+          "temperature_sensor": "Temperature sensor"
+        }
+      }
+    }
   }
 }
