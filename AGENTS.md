@@ -7,15 +7,20 @@ Controls the built-in fan (speed 0–100%) and power mode (Always ON / Default)
 via I2C bus. Supports both Classic cases (Pi 3/4) and V3/V5 cases (Pi 5) with
 different I2C protocols.
 
+Fan preset modes (Silent, Default, Performance) provide automatic
+temperature-based speed control with hysteresis when a temperature sensor is
+configured via the options flow.
+
 Installed via HACS as a custom integration. Configured through the HA UI
-(config flow). No YAML configuration.
+(config flow + options flow). No YAML configuration.
 
 ## Technical Context
 
 - **Language/Version**: Python 3.12+
-- **Primary Dependencies**: `homeassistant` (core), `smbus2==0.6.0` (I2C),
-  `voluptuous` (config flow validation, transitive via HA)
-- **Storage**: Home Assistant config entries (managed by HA Core)
+- **Primary Dependencies**: `homeassistant==2026.1.1` (core),
+  `smbus2==0.6.0` (I2C), `voluptuous` (config/options flow validation,
+  transitive via HA)
+- **Storage**: Home Assistant config entries and options (managed by HA Core)
 - **Testing**: N/A (no test suite yet; target framework: `pytest` +
   `pytest-homeassistant-custom-component`)
 - **Target Platform**: Home Assistant OS on Raspberry Pi 3/4/5
@@ -34,7 +39,7 @@ Installed via HACS as a custom integration. Configured through the HA UI
 ├── .devcontainer.json           # VS Code devcontainer config (HA dev env)
 ├── .gitattributes               # Git line-ending and diff settings
 ├── .github/
-│   ├── ISSUE_TEMPLATE/          # Bug report & feature request templates
+│   ├── ISSUE_TEMPLATE/          # Bug report, feature request & testing templates
 │   ├── dependabot.yml           # Dependabot config for deps updates
 │   └── workflows/
 │       ├── lint.yml             # Ruff lint & format CI
@@ -43,13 +48,13 @@ Installed via HACS as a custom integration. Configured through the HA UI
 │   └── configuration.yaml       # HA dev config (devcontainer)
 ├── custom_components/argon_one/ # HA custom integration package
 │   ├── __init__.py              # Entry point: async_setup_entry / async_unload_entry
-│   ├── config_flow.py           # UI config flow: case type selection, I2C check
-│   ├── const.py                 # Constants: domain, I2C addresses, case types
-│   ├── fan.py                   # FanEntity: speed control via I2C
+│   ├── config_flow.py           # Config flow + options flow (case type, temp sensor)
+│   ├── const.py                 # Constants: I2C, case types, preset curves
+│   ├── fan.py                   # FanEntity: speed control, preset modes, sensor tracking
 │   ├── switch.py                # SwitchEntity: Always ON mode (Classic only)
 │   ├── manifest.json            # Integration metadata
 │   └── translations/
-│       └── en.json              # English strings for config flow
+│       └── en.json              # English strings for config & options flows
 ├── scripts/
 │   ├── develop                  # Start HA in dev mode
 │   ├── lint                     # Run ruff format + check
@@ -98,10 +103,19 @@ step. The integration is loaded by HA at runtime.
    `switch.turn_on` / `switch.turn_off`.
 7. **Typed config entry** — use `ArgonOneConfigEntry` (defined in `__init__.py`)
    which is `ConfigEntry[SMBus]`. Access the bus via `entry.runtime_data`.
-8. **Error handling** — on I2C `IOError`, set `_attr_available = False` and
+8. **Error handling** — on I2C `OSError`, set `_attr_available = False` and
    call `self.async_write_ha_state()`. Restore on next successful operation.
-9. **Keep it simple** — project principle is to avoid over-engineering.
-   No GPIO button handling, no preset modes (yet), no complex abstractions.
+9. **Options flow with reload** — `ArgonOneOptionsFlow` extends
+   `OptionsFlowWithReload`. Changing the temperature sensor causes full
+   platform reload; fan reads sensor entity from `entry.options` at init.
+10. **Preset modes require a temperature sensor** — `FanEntityFeature.PRESET_MODE`
+    is only added when `entry.options[CONF_TEMP_SENSOR]` is set. Without a
+    sensor, presets are unavailable.
+11. **Temperature curves and hysteresis** — preset curves are defined in
+    `const.py` → `PRESET_CURVES`. Speed decreases only when temperature drops
+    below (threshold − `HYSTERESIS_CELSIUS`), preventing fan oscillation.
+12. **Keep it simple** — project principle is to avoid over-engineering.
+    No GPIO button handling, no complex abstractions.
 
 ## Code Guidelines
 
@@ -114,6 +128,12 @@ step. The integration is loaded by HA at runtime.
   or data coordinator needed.
 - **DeviceInfo**: Defined inline in each entity's `__init__` with shared
   `identifiers` so HA groups entities under one device.
+- **Sensor tracking**: When a preset mode is active, `fan.py` subscribes to
+  temperature sensor state changes via `async_track_state_change_event` and
+  unsubscribes on preset clear or entity removal.
+- **Config flow + options flow**: `config_flow.py` contains both
+  `ArgonOneConfigFlow` (case type selection, I2C validation) and
+  `ArgonOneOptionsFlow` (temperature sensor selection for presets).
 
 ### Code Quality
 
@@ -122,9 +142,11 @@ step. The integration is loaded by HA at runtime.
 - **Logging**: Use `_LOGGER = logging.getLogger(__name__)` per module.
   Log I2C errors at `error` level, diagnostics at `warning`/`debug`.
 - **Constants**: All magic numbers go in `const.py`. No inline hex values
-  in business logic.
+  in business logic. Temperature curves are data-driven via `PRESET_CURVES`.
 - **HA entity pattern**: Use `_attr_*` class attributes for static properties;
-  use `@property` for dynamic state (`is_on`, `percentage`).
+  use `@property` for dynamic state (`is_on`, `percentage`, `preset_mode`).
+- **Pure logic as static methods**: `_compute_speed` is a `@staticmethod` —
+  easy to test without HA runtime.
 
 ### Testing
 
@@ -133,6 +155,10 @@ step. The integration is loaded by HA at runtime.
   - Mock `smbus2.SMBus` for all I2C operations
   - Test config flow (success, I2C unavailable, I2C device not found,
     already configured)
+  - Test options flow (set/clear temperature sensor)
   - Test fan entity (set speed, turn on/off, I2C error → unavailable)
+  - Test preset modes (`_compute_speed` with various temperatures and
+    hysteresis edge cases)
+  - Test sensor tracking (subscribe/unsubscribe lifecycle, sensor unavailable)
   - Test switch entity (turn on/off, I2C error → unavailable)
   - Test platform loading (Classic → fan + switch; Pi 5 → fan only)
