@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Build a release zip archive from custom_components/argon_one.
+#
+# Usage: build-release-zip [output_path]
+# Default output: argon_one.zip in the repository root.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+OUTPUT="${1:-$REPO_ROOT/argon_one.zip}"
+
+cd "$REPO_ROOT/custom_components"
+zip -r "$OUTPUT" argon_one/ -x '*.pyc' '*__pycache__*' '*.DS_Store'
+
+echo "Built: $OUTPUT"

@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Bump version in pyproject.toml, manifest.json, and CHANGELOG.md.
+#
+# Usage: bump-version <patch|minor|major>
+# Output (stdout): CURRENT_VERSION=x.y.z  NEW_VERSION=x.y.z
+#
+# When GITHUB_OUTPUT is set (CI), also writes to $GITHUB_OUTPUT.
+
+set -euo pipefail
+
+BUMP_TYPE="${1:?Usage: bump-version <patch|minor|major>}"
+
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+PYPROJECT="$REPO_ROOT/pyproject.toml"
+MANIFEST="$REPO_ROOT/custom_components/argon_one/manifest.json"
+CHANGELOG="$REPO_ROOT/CHANGELOG.md"
+REPO_URL="https://github.com/fix-parrot/argon-one"
+
+# --- Read current version ---------------------------------------------------
+
+CURRENT="$(sed -n 's/^version = "\(.*\)"/\1/p' "$PYPROJECT")"
+if [[ ! "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "::error::Invalid current version format: $CURRENT" >&2
+  exit 1
+fi
+
+# --- Compute new version ----------------------------------------------------
+
+IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+case "$BUMP_TYPE" in
+  major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+  minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+  patch) PATCH=$((PATCH + 1)) ;;
+  *) echo "::error::Unknown bump type: $BUMP_TYPE" >&2; exit 1 ;;
+esac
+NEW="${MAJOR}.${MINOR}.${PATCH}"
+
+# --- Update pyproject.toml --------------------------------------------------
+
+sed -i.bak "s/^version = \"$CURRENT\"/version = \"$NEW\"/" "$PYPROJECT"
+rm -f "$PYPROJECT.bak"
+
+# --- Update manifest.json ---------------------------------------------------
+
+jq --arg v "$NEW" '.version = $v' "$MANIFEST" > "$MANIFEST.tmp" \
+  && mv "$MANIFEST.tmp" "$MANIFEST"
+
+# --- Update CHANGELOG.md ----------------------------------------------------
+
+TODAY="$(date -u +%Y-%m-%d)"
+
+# Replace ## [Unreleased] with new version header, add new Unreleased above
+sed -i.bak "s/^## \[Unreleased\]/## [Unreleased]\n\n## [$NEW] - $TODAY/" "$CHANGELOG"
+
+# Update [unreleased] comparison link
+sed -i.bak "s|\[unreleased\]: .*|[unreleased]: $REPO_URL/compare/v${NEW}...HEAD|" "$CHANGELOG"
+
+# Add new version comparison link after the [unreleased] link
+sed -i.bak "/^\[unreleased\]:/a\\
+[$NEW]: $REPO_URL/compare/v${CURRENT}...v${NEW}" "$CHANGELOG"
+
+rm -f "$CHANGELOG.bak"
+
+# --- Output ------------------------------------------------------------------
+
+echo "CURRENT_VERSION=$CURRENT"
+echo "NEW_VERSION=$NEW"
+
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  echo "current_version=$CURRENT" >> "$GITHUB_OUTPUT"
+  echo "new_version=$NEW" >> "$GITHUB_OUTPUT"
+fi
