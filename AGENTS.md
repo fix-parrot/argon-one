@@ -42,9 +42,16 @@ Installed via HACS as a custom integration. Configured through the HA UI
 │   └── devcontainer.json        # VS Code devcontainer config (HA dev env)
 ├── .github/
 │   ├── ISSUE_TEMPLATE/          # Bug report, feature request & testing templates
+│   ├── scripts/
+│   │   ├── build-release-zip    # Build zip archive from custom_components/
+│   │   ├── bump-version         # Bump version in pyproject.toml, manifest, CHANGELOG
+│   │   └── extract-changelog    # Extract release notes for a given version
 │   ├── dependabot.yml           # Dependabot config for deps updates
 │   └── workflows/
+│       ├── bump.yml             # Version bump workflow (workflow_dispatch)
 │       ├── lint.yml             # Ruff + mypy CI
+│       ├── release.yml          # Build zip + GitHub Release on tag push
+│       ├── tag.yml              # Auto-tag + release on merged bump PR
 │       ├── test.yml             # Pytest + coverage CI
 │       └── validate.yml         # Hassfest + HACS validation CI
 ├── config/
@@ -70,6 +77,7 @@ Installed via HACS as a custom integration. Configured through the HA UI
 │   ├── test_switch.py           # Switch entity tests (on/off, I2C errors)
 │   └── test_init.py             # Platform loading + unload tests
 ├── scripts/
+│   ├── deploy                   # Automated deployment to HA instances
 │   ├── develop                  # Start HA in dev mode (mock I2C)
 │   ├── lint                     # Run ruff format + check via uv
 │   ├── setup                    # uv sync
@@ -103,6 +111,8 @@ step. The integration is loaded by HA at runtime.
 - **Validate manifest**: `python -m script.hassfest --integration-path custom_components/argon_one`
   (requires HA Core dev environment)
 - **HACS validation**: `gh workflow run validate.yml` (or auto on push/PR to main)
+- **Bump version**: `gh workflow run bump.yml -f bump_type=patch` (creates PR)
+- **Release (manual tag)**: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`
 
 ## Contribution Instructions
 
@@ -166,6 +176,32 @@ step. The integration is loaded by HA at runtime.
   use `@property` for dynamic state (`is_on`, `percentage`, `preset_mode`).
 - **Pure logic as static methods**: `_compute_speed` is a `@staticmethod` —
   easy to test without HA runtime.
+
+### CI/CD Security (GitHub Actions)
+
+- **No `${{ }}` in `run:` for untrusted data**: Never interpolate GitHub
+  context expressions (`github.event.pull_request.title`, `.body`, etc.)
+  directly in `run:` blocks — this is a shell injection vector. Pass through
+  `env:` instead and use `"$VAR"` in the script.
+- **Validated outputs are safe**: Step outputs that passed regex validation
+  (e.g., `^[0-9]+\.[0-9]+\.[0-9]+$`) contain only safe characters and may
+  be used via `${{ }}` in `run:` blocks.
+- **`type: choice` for workflow inputs**: Always use `type: choice` (not
+  `type: string`) for `workflow_dispatch` inputs used in shell commands.
+- **Double-quote all shell variables**: Always `"$VAR"`, never `$VAR`.
+- **Least privilege permissions**: Each workflow declares only the permissions
+  it needs. CI workflows (`lint.yml`, `test.yml`, `validate.yml`) use
+  `permissions: {}`. Release workflows declare `contents: write` only where
+  required.
+- **No `pull_request_target`**: Tag workflow uses `pull_request` trigger
+  (not `pull_request_target`) to avoid running untrusted PR code with write
+  token.
+- **Version source**: Tag workflow extracts version from `manifest.json` on
+  the merged branch, never from PR title or other user-controlled fields.
+- **CI scripts in `.github/scripts/`**: Reusable shell scripts called from
+  workflows. Scripts must never accept unfiltered user-controlled input
+  (PR title, body, etc.) as positional arguments — pass such data only via
+  env variables with double-quoting. All scripts use `set -euo pipefail`.
 
 ### Testing
 
