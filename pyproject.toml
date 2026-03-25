@@ -1,0 +1,26 @@
+[project]
+name = "argon-one"
+version = "0.1.0"
+description = "Custom Home Assistant integration for Argon ONE Raspberry Pi cases"
+requires-python = ">=3.13.2"
+license = { text = "MIT" }
+dependencies = [
+    "homeassistant==2026.1.1",
+    "smbus2==0.6.0",
+    "colorlog==6.10.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-homeassistant-custom-component==0.13.306",
+    "pytest-cov",
+    "pytest-asyncio",
+    "mypy",
+    "pre-commit",
+    "ruff==0.15.7",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

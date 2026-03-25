@@ -30,6 +30,10 @@ HYSTERESIS_CELSIUS = 2.0
 # Options keys
 CONF_TEMP_SENSOR = "temperature_sensor"
 
+# Config flow error keys
+ERR_I2C_NOT_AVAILABLE = "i2c_not_available"
+ERR_I2C_DEVICE_NOT_FOUND = "i2c_device_not_found"
+
 # Fan preset modes
 PRESET_SILENT = "silent"
 PRESET_DEFAULT = "default"

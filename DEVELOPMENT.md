@@ -2,14 +2,16 @@
 
 ## Prerequisites
 
-- **Python**: 3.12+
+- **Python**: 3.13.2+
 - **Git**
+- **[uv](https://docs.astral.sh/uv/)** — package manager and virtual
+  environment tool
 - **Docker** (recommended) — for the VS Code devcontainer workflow
 - **Hardware** (for on-device testing): Raspberry Pi 3/4/5 with an Argon ONE
   case and I2C enabled (`/dev/i2c-1`)
 
-No additional package managers or build tools are required. The integration has
-no standalone build step — it is loaded by Home Assistant at runtime.
+The integration has no standalone build step — it is loaded by Home Assistant
+at runtime. Dependencies are managed via `pyproject.toml` and `uv.lock`.
 
 ## Getting Started
 
@@ -29,8 +31,8 @@ environment with all dependencies pre-installed.
    `Dev Containers: Reopen in Container` from the command palette). The
    container image is `mcr.microsoft.com/devcontainers/python:3.13`.
 
-3. **Wait for setup** — the `scripts/setup` post-create command installs
-   dependencies from `requirements.txt` automatically.
+3. **Wait for setup** — the `scripts/setup` post-create command runs
+   `uv sync` to install all dependencies into `.venv` automatically.
 
 4. **Start Home Assistant**
 
@@ -39,16 +41,20 @@ environment with all dependencies pre-installed.
    ```
 
    This starts HA in debug mode on port **8123** using `config/configuration.yaml`.
-   The script adds `custom_components/` to `PYTHONPATH`, so the integration is
-   available without symlinking.
+   The script prepends `testing/mock_smbus2/` and `custom_components/` to
+   `PYTHONPATH`, so the integration loads with a fake I2C module.
 
 5. **Add the integration** — open `http://localhost:8123`, go to Settings →
    Devices & Services → Add Integration → search **Argon ONE** → select case
    type.
 
-> **Note:** I2C hardware is not available inside the container. The config flow
-> will fail at the I2C validation step. This setup is useful for UI development,
-> config flow testing (with mocked I2C), and code iteration.
+6. **Test preset modes** — the dev config includes a mock temperature sensor
+   (`sensor.mock_temperature`) backed by `input_number.mock_temperature`. Use
+   the slider in the UI to change temperature and observe fan speed changes.
+
+> **Note:** I2C hardware is not available inside the container. The
+> `testing/mock_smbus2/` module provides a fake `SMBus` that logs all I2C
+> calls instead of performing real I/O.
 
 ### Option B: Manual setup on Raspberry Pi
 
@@ -81,6 +87,22 @@ Use this when you need to test against real hardware.
 4. **Add the integration** — Settings → Devices & Services → Add Integration →
    search **Argon ONE** → select case type (Classic or Pi 5).
 
+### Option C: Automated deployment
+
+Deploy the integration to a remote Home Assistant instance via SSH:
+
+```bash
+./scripts/deploy                                  # default: root@homeassistant.local:2222
+./scripts/deploy root@192.168.1.100:2222          # custom host/port
+./scripts/deploy pi@ha.local                      # port defaults to 22
+```
+
+The script packs `custom_components/argon_one` with `tar`, uploads it over SSH,
+and unpacks into `/config/custom_components/` on the target.
+
+**Requirements:**
+- SSH key authentication configured for the target host
+
 ## Environment Configuration
 
 ### Dev HA config
@@ -108,20 +130,30 @@ Python formatting on save is enabled by default (`editor.formatOnSave: true`).
 
 ### Dependencies
 
-All development dependencies are listed in `requirements.txt`:
+Dependencies are declared in `pyproject.toml` and locked in `uv.lock`.
+
+**Runtime:**
 
 | Package | Version | Purpose |
 |---|---|---|
 | `homeassistant` | 2026.1.1 | HA Core (runtime) |
 | `smbus2` | 0.6.0 | I2C communication |
-| `ruff` | 0.15.7 | Linter and formatter |
 | `colorlog` | 6.10.1 | HA logging dependency |
-| `pip` | ≥ 21.3.1 | Package manager |
+
+**Dev (dependency group `dev`):**
+
+| Package | Purpose |
+|---|---|
+| `pytest` + `pytest-homeassistant-custom-component` | Test framework |
+| `pytest-cov` + `pytest-asyncio` | Coverage and async support |
+| `mypy` | Static type checking |
+| `ruff` | Linter and formatter |
+| `pre-commit` | Git hooks |
 
 Install manually (outside devcontainer):
 
 ```bash
-python3 -m pip install -r requirements.txt
+uv sync
 ```
 
 ## Project Structure
@@ -164,13 +196,21 @@ Run locally:
 scripts/lint
 ```
 
-This executes `ruff format .` followed by `ruff check . --fix`.
+This executes `uv run ruff format .` followed by `uv run ruff check . --fix`.
 
 To check without auto-fixing (same as CI):
 
 ```bash
-ruff check .
-ruff format . --check
+uv run ruff check .
+uv run ruff format . --check
+```
+
+### Type checking
+
+The project uses [mypy](https://mypy-lang.org/) configured in `mypy.ini`.
+
+```bash
+uv run mypy custom_components/argon_one/
 ```
 
 ### Validating the manifest
@@ -187,15 +227,31 @@ consistency. This validation also runs automatically in CI (see below).
 
 ### Running tests
 
-No test suite exists yet. When adding tests, use:
+The test suite uses `pytest` with `pytest-homeassistant-custom-component`.
 
 ```bash
-pip install pytest pytest-homeassistant-custom-component
-pytest tests/
+scripts/test
 ```
 
-See [AGENTS.md → Testing](AGENTS.md#testing) for test guidelines and what to
-cover.
+This runs `uv run pytest tests/ --cov=custom_components/argon_one --cov-report=term-missing`.
+
+Run a specific test file or test:
+
+```bash
+uv run pytest tests/test_fan.py -v
+uv run pytest tests/test_fan.py::test_set_percentage -v
+```
+
+See [AGENTS.md → Testing](AGENTS.md#testing) for test guidelines and coverage.
+
+### Pre-commit hooks
+
+The project includes a `.pre-commit-config.yaml` with ruff and mypy hooks.
+
+```bash
+uv run pre-commit install          # one-time setup
+uv run pre-commit run --all-files  # manual run
+```
 
 ### Version bumping
 
@@ -207,11 +263,12 @@ Update the version and document changes in `CHANGELOG.md`.
 
 ## CI Pipelines
 
-Two GitHub Actions workflows run automatically on pushes and PRs to `main`:
+Three GitHub Actions workflows run automatically on pushes and PRs to `main`:
 
 | Workflow | File | What it checks |
 |---|---|---|
-| **Lint** | `.github/workflows/lint.yml` | `ruff check .` and `ruff format . --check` |
+| **Lint** | `.github/workflows/lint.yml` | `ruff check .`, `ruff format . --check`, `mypy` |
+| **Test** | `.github/workflows/test.yml` | `pytest` with coverage |
 | **Validate** | `.github/workflows/validate.yml` | Hassfest manifest validation + HACS compliance |
 
 The Validate workflow also runs daily on a schedule and can be triggered

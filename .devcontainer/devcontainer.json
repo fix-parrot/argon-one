@@ -29,7 +29,7 @@
                 "files.trimTrailingWhitespace": true,
                 "python.analysis.typeCheckingMode": "basic",
                 "python.analysis.autoImportCompletions": true,
-                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
                 "[python]": {
                     "editor.defaultFormatter": "charliermarsh.ruff"
                 }
@@ -40,6 +40,7 @@
     "features": {
         "ghcr.io/devcontainers-extra/features/apt-packages:1": {
             "packages": "ffmpeg,libturbojpeg0,libpcap-dev"
-        }
+        },
+        "ghcr.io/astral-sh/setup-uv:1": {}
     }
 }

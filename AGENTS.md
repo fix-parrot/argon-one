@@ -16,13 +16,15 @@ Installed via HACS as a custom integration. Configured through the HA UI
 
 ## Technical Context
 
-- **Language/Version**: Python 3.12+
+- **Language/Version**: Python 3.13.2+
 - **Primary Dependencies**: `homeassistant==2026.1.1` (core),
   `smbus2==0.6.0` (I2C), `voluptuous` (config/options flow validation,
   transitive via HA)
+- **Package Manager**: `uv` — dependencies in `pyproject.toml`, locked in
+  `uv.lock`, virtual env in `.venv`
 - **Storage**: Home Assistant config entries and options (managed by HA Core)
-- **Testing**: N/A (no test suite yet; target framework: `pytest` +
-  `pytest-homeassistant-custom-component`)
+- **Testing**: `pytest` + `pytest-homeassistant-custom-component==0.13.306`
+  (84 tests, 92% coverage)
 - **Target Platform**: Home Assistant OS on Raspberry Pi 3/4/5
 - **Project Type**: single — custom HA integration, installed via HACS
 - **Min HA Version**: 2026.1
@@ -36,16 +38,17 @@ Installed via HACS as a custom integration. Configured through the HA UI
 
 ```text
 .
-├── .devcontainer.json           # VS Code devcontainer config (HA dev env)
-├── .gitattributes               # Git line-ending and diff settings
+├── .devcontainer/
+│   └── devcontainer.json        # VS Code devcontainer config (HA dev env)
 ├── .github/
 │   ├── ISSUE_TEMPLATE/          # Bug report, feature request & testing templates
 │   ├── dependabot.yml           # Dependabot config for deps updates
 │   └── workflows/
-│       ├── lint.yml             # Ruff lint & format CI
+│       ├── lint.yml             # Ruff + mypy CI
+│       ├── test.yml             # Pytest + coverage CI
 │       └── validate.yml         # Hassfest + HACS validation CI
 ├── config/
-│   └── configuration.yaml       # HA dev config (devcontainer)
+│   └── configuration.yaml       # HA dev config (mock temp sensor + debug logging)
 ├── custom_components/argon_one/ # HA custom integration package
 │   ├── __init__.py              # Entry point: async_setup_entry / async_unload_entry
 │   ├── config_flow.py           # Config flow + options flow (case type, temp sensor)
@@ -55,12 +58,27 @@ Installed via HACS as a custom integration. Configured through the HA UI
 │   ├── manifest.json            # Integration metadata
 │   └── translations/
 │       └── en.json              # English strings for config & options flows
+├── testing/
+│   └── mock_smbus2/
+│       └── smbus2.py            # Fake SMBus for devcontainer (logs I2C calls)
+├── tests/
+│   ├── conftest.py              # Shared fixtures (mock_smbus, config entries)
+│   ├── test_compute_speed.py    # Unit tests for _compute_speed + hysteresis
+│   ├── test_config_flow.py      # Config flow tests (success, errors, abort)
+│   ├── test_options_flow.py     # Options flow tests (set/clear sensor)
+│   ├── test_fan.py              # Fan entity tests (speed, presets, I2C, sensor)
+│   ├── test_switch.py           # Switch entity tests (on/off, I2C errors)
+│   └── test_init.py             # Platform loading + unload tests
 ├── scripts/
-│   ├── develop                  # Start HA in dev mode
-│   ├── lint                     # Run ruff format + check
-│   └── setup                    # Install Python deps
+│   ├── develop                  # Start HA in dev mode (mock I2C)
+│   ├── lint                     # Run ruff format + check via uv
+│   ├── setup                    # uv sync
+│   └── test                     # Run pytest with coverage via uv
+├── .pre-commit-config.yaml      # Pre-commit hooks (ruff + mypy)
 ├── .ruff.toml                   # Ruff linter/formatter config
-├── requirements.txt             # Dev dependencies
+├── mypy.ini                     # Mypy type checker config
+├── pyproject.toml               # Project metadata + dependencies
+├── uv.lock                      # Locked dependency versions
 ├── hacs.json                    # HACS repository metadata
 ├── CONTRIBUTING.md              # Contribution guidelines
 ├── CHANGELOG.md                 # Project changelog
@@ -75,15 +93,16 @@ Installed via HACS as a custom integration. Configured through the HA UI
 This is a Home Assistant custom integration — there is no standalone build
 step. The integration is loaded by HA at runtime.
 
-- **Install for development**: Copy `custom_components/argon_one/` into HA's
-  `config/custom_components/` directory and restart HA
+- **Install for development**: `uv sync` (creates `.venv` with all deps)
+- **Run tests**: `scripts/test` (runs `uv run pytest tests/ --cov`)
+- **Lint**: `scripts/lint` (runs `uv run ruff format .` + `uv run ruff check . --fix`)
+- **Type check**: `uv run mypy custom_components/argon_one/`
+- **Format**: `uv run ruff format .`
+- **Dev server**: `scripts/develop` (starts HA with mock I2C)
+- **Deploy**: `scripts/deploy` (automated deployment to HA instances)
 - **Validate manifest**: `python -m script.hassfest --integration-path custom_components/argon_one`
   (requires HA Core dev environment)
 - **HACS validation**: `gh workflow run validate.yml` (or auto on push/PR to main)
-- **Run tests**: N/A (no test suite yet)
-- **Lint**: `scripts/lint` (runs `ruff format .` + `ruff check . --fix`)
-- **Format**: `ruff format .`
-- **Dev server**: `scripts/develop` (starts HA with devcontainer config)
 
 ## Contribution Instructions
 
@@ -150,15 +169,14 @@ step. The integration is loaded by HA at runtime.
 
 ### Testing
 
-- No test suite exists yet. When adding tests:
-  - Use `pytest-homeassistant-custom-component`
-  - Mock `smbus2.SMBus` for all I2C operations
-  - Test config flow (success, I2C unavailable, I2C device not found,
-    already configured)
-  - Test options flow (set/clear temperature sensor)
-  - Test fan entity (set speed, turn on/off, I2C error → unavailable)
-  - Test preset modes (`_compute_speed` with various temperatures and
-    hysteresis edge cases)
-  - Test sensor tracking (subscribe/unsubscribe lifecycle, sensor unavailable)
-  - Test switch entity (turn on/off, I2C error → unavailable)
-  - Test platform loading (Classic → fan + switch; Pi 5 → fan only)
+- **Framework**: `pytest` + `pytest-homeassistant-custom-component`
+- **Coverage**: 92% (84 tests)
+- **Mock strategy**: `conftest.py` patches `custom_components.argon_one.SMBus`
+  and `smbus2.SMBus` via a `mock_smbus` fixture
+- **Test files**:
+  - `test_compute_speed.py` — `_compute_speed` with all curves and hysteresis
+  - `test_config_flow.py` — success, I2C errors, single_instance_allowed
+  - `test_options_flow.py` — set/clear temperature sensor
+  - `test_fan.py` — speed control, presets, sensor tracking, I2C errors
+  - `test_switch.py` — on/off, I2C errors, recovery
+  - `test_init.py` — platform loading (Classic vs Pi 5), unload

@@ -7,14 +7,17 @@ cd "$(dirname "$0")/.."
 # Create config dir if not present
 if [[ ! -d "${PWD}/config" ]]; then
     mkdir -p "${PWD}/config"
-    hass --config "${PWD}/config" --script ensure_config
+    uv run hass --config "${PWD}/config" --script ensure_config
 fi
 
-# Set the path to custom_components
-## This lets us have the structure we want <root>/custom_components/argon_one
-## while at the same time have Home Assistant configuration inside <root>/config
-## without resulting to symlinks.
-export PYTHONPATH="${PYTHONPATH}:${PWD}/custom_components"
+# Prepend mock smbus2 so `import smbus2` resolves to the fake module
+export PYTHONPATH="${PWD}/testing/mock_smbus2:${PWD}/custom_components${PYTHONPATH:+:$PYTHONPATH}"
+
+# Create fake /dev/i2c-1 so config_flow's Path.exists() check passes
+if [[ ! -e /dev/i2c-1 ]]; then
+    echo "Creating /dev/i2c-1 (requires sudo)..."
+    sudo touch /dev/i2c-1
+fi
 
 # Start Home Assistant
-hass --config "${PWD}/config" --debug
+uv run hass --config "${PWD}/config" --debug
