@@ -1,0 +1,90 @@
+name: Bump Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: Bump version and create PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate unreleased changes exist
+        run: |
+          CONTENT="$(sed -n '/^## \[Unreleased\]/,/^## \[/{/^## \[/!p}' CHANGELOG.md | sed '/^$/d; /^### /d')"
+          if [[ -z "$CONTENT" ]]; then
+            echo "::error::No unreleased changes found in CHANGELOG.md"
+            exit 1
+          fi
+
+      - name: Bump version in project files
+        id: bump
+        run: .github/scripts/bump-version "${{ inputs.bump_type }}"
+
+      - name: Validate tag does not exist
+        run: |
+          if git rev-parse "v${{ steps.bump.outputs.new_version }}" >/dev/null 2>&1; then
+            echo "::error::Tag v${{ steps.bump.outputs.new_version }} already exists"
+            exit 1
+          fi
+
+      - name: Validate branch does not exist
+        run: |
+          if git ls-remote --exit-code --heads origin "release/v${{ steps.bump.outputs.new_version }}" >/dev/null 2>&1; then
+            echo "::error::Branch release/v${{ steps.bump.outputs.new_version }} already exists"
+            exit 1
+          fi
+
+      - name: Create release branch, commit and push
+        run: |
+          git checkout -b "release/v${{ steps.bump.outputs.new_version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml custom_components/argon_one/manifest.json CHANGELOG.md
+          git commit -m "Bump version to ${{ steps.bump.outputs.new_version }}"
+          git push origin "release/v${{ steps.bump.outputs.new_version }}"
+
+      - name: Extract changelog for PR body
+        id: changelog
+        run: |
+          VERSION="${{ steps.bump.outputs.new_version }}"
+          NOTES="$(.github/scripts/extract-changelog "$VERSION")"
+          {
+            echo "body<<PR_BODY_EOF"
+            echo "## Version bump: ${{ steps.bump.outputs.current_version }} → $VERSION"
+            echo ""
+            echo "**Bump type**: ${{ inputs.bump_type }}"
+            echo ""
+            echo "### Changes"
+            echo "$NOTES"
+            echo "PR_BODY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BODY: ${{ steps.changelog.outputs.body }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "release/v${{ steps.bump.outputs.new_version }}" \
+            --title "Release v${{ steps.bump.outputs.new_version }}" \
+            --label "release" \
+            --body "$PR_BODY"

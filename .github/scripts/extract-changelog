@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Extract release notes for a specific version from CHANGELOG.md.
+#
+# Usage: extract-changelog <version>
+# Output (stdout): release notes text
+#
+# When GITHUB_OUTPUT is set (CI), also writes a multiline "body" output.
+
+set -euo pipefail
+
+VERSION="${1:?Usage: extract-changelog <version>}"
+
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+CHANGELOG="$REPO_ROOT/CHANGELOG.md"
+
+# Extract content between ## [VERSION] and next ## [
+# Also strip reference-style link definitions that appear at the end of the file
+NOTES="$(sed -n "/^## \[$VERSION\]/,/^## \[/{/^## \[/!p}" "$CHANGELOG" | sed '/^\[.*\]:/d')"
+
+if [[ -z "$NOTES" ]]; then
+  NOTES="See [CHANGELOG.md](CHANGELOG.md) for details."
+fi
+
+echo "$NOTES"
+
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  {
+    echo "body<<RELEASE_NOTES_EOF"
+    echo "$NOTES"
+    echo "RELEASE_NOTES_EOF"
+  } >> "$GITHUB_OUTPUT"
+fi

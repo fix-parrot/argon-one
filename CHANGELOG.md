@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fan preset modes (Silent, Default, Performance) with automatic temperature-based speed control via a configurable HA sensor ([#7](https://github.com/fix-parrot/argon-one/issues/7))
 - Complete development workflow overhaul: `uv` package management, 84 tests, CI/CD pipeline, static analysis tooling, mock dev environment, and infrastructure improvements ([#10](https://github.com/fix-parrot/argon-one/issues/10))
+- Automated release pipeline with GitHub Actions and helper scripts ([#11](https://github.com/fix-parrot/argon-one/issues/11))
 
 ## [0.1.0] - 2026-03-21
 

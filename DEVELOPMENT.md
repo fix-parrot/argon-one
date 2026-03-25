@@ -261,6 +261,52 @@ a separate version.
 
 Update the version and document changes in `CHANGELOG.md`.
 
+## Releasing
+
+There are two ways to create a release:
+
+### Path A: Automated (GitHub UI)
+
+1. **Bump version** — go to the GitHub Actions tab, select **Bump Version**,
+   click **Run workflow**, and choose the bump type (`patch`, `minor`, or
+   `major`). The workflow creates a branch `release/vX.Y.Z` with version
+   updates in `pyproject.toml`, `manifest.json`, and `CHANGELOG.md`, then
+   opens a PR titled `Release vX.Y.Z` with the `release` label.
+
+2. **Review & merge** — review the PR (verify version numbers and CHANGELOG
+   content), approve and merge it into `main`.
+
+3. **Tag & release** — after the merge, the **Tag and Release** workflow
+   automatically creates an annotated tag `vX.Y.Z`, deletes the release
+   branch, builds `argon_one.zip`, and publishes a GitHub Release with
+   release notes extracted from CHANGELOG.md.
+
+### Path B: Manual (local bump + tag push)
+
+1. **Bump version locally** — update version in `pyproject.toml`,
+   `manifest.json`, and `CHANGELOG.md` (e.g., via `/dev-bumpversion`).
+
+2. **Commit & push** — commit the changes and push (through a PR if branch
+   protection requires it).
+
+3. **Create and push tag**:
+
+   ```bash
+   git tag -a v0.2.0 -m "Release v0.2.0"
+   git push origin v0.2.0
+   ```
+
+4. **Release** — the **Release** workflow triggers on the tag push, builds
+   `argon_one.zip`, and creates a GitHub Release with release notes.
+
+### Release workflows
+
+| Workflow | File | Trigger |
+|---|---|---|
+| **Bump Version** | `.github/workflows/bump.yml` | `workflow_dispatch` (manual) |
+| **Tag and Release** | `.github/workflows/tag.yml` | Merged PR with `release` label |
+| **Release** | `.github/workflows/release.yml` | Tag push `v*` |
+
 ## CI Pipelines
 
 Three GitHub Actions workflows run automatically on pushes and PRs to `main`:
