@@ -1,0 +1,67 @@
+name: Tag and Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    name: Create tag and release
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from manifest
+        id: version
+        run: |
+          VERSION="$(jq -r .version custom_components/argon_one/manifest.json)"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version in manifest.json: $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Note: Tags pushed with GITHUB_TOKEN do not trigger other workflows,
+      # so this will NOT trigger release.yml. The full release is handled here.
+      # release.yml only runs for manually pushed tags.
+      - name: Create and push tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Delete release branch
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git ls-remote --exit-code --heads origin "release/v$VERSION" >/dev/null 2>&1; then
+            git push origin --delete "release/v$VERSION"
+          fi
+
+      - name: Build zip archive
+        run: .github/scripts/build-release-zip
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: .github/scripts/extract-changelog "${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BODY: ${{ steps.notes.outputs.body }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          gh release create "v$VERSION" \
+            argon_one.zip \
+            --title "v$VERSION" \
+            --notes "$RELEASE_BODY"
