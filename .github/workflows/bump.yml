@@ -53,6 +53,7 @@ jobs:
           fi
 
       - name: Create release branch, commit and push
+        id: push
         run: |
           git checkout -b "release/v${{ steps.bump.outputs.new_version }}"
           git config user.name "github-actions[bot]"
@@ -88,3 +89,10 @@ jobs:
             --title "Release v${{ steps.bump.outputs.new_version }}" \
             --label "release" \
             --body "$PR_BODY"
+
+      - name: Rollback release branch on failure
+        if: failure() && steps.push.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git push origin --delete "release/v${{ steps.bump.outputs.new_version }}"
