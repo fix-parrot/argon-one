@@ -9,7 +9,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUTPUT="${1:-$REPO_ROOT/argon_one.zip}"
 
-cd "$REPO_ROOT/custom_components"
-zip -r "$OUTPUT" argon_one/ -x '*.pyc' '*__pycache__*' '*.DS_Store'
+cd "$REPO_ROOT/custom_components/argon_one"
+zip -r "$OUTPUT" . -x '*.pyc' '*__pycache__*' '*.DS_Store'
 
 echo "Built: $OUTPUT"
