@@ -1,13 +1,17 @@
 {
   "domain": "argon_one",
   "name": "Argon ONE",
-  "codeowners": ["@fix-parrot"],
+  "codeowners": [
+    "@fix-parrot"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/fix-parrot/argon-one",
   "integration_type": "device",
   "iot_class": "assumed_state",
   "issue_tracker": "https://github.com/fix-parrot/argon-one/issues",
-  "requirements": ["smbus2==0.6.0"],
+  "requirements": [
+    "smbus2==0.6.0"
+  ],
   "single_config_entry": true,
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
