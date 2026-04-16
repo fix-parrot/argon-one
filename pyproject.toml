@@ -6,7 +6,7 @@ requires-python = ">=3.13.2"
 license = { text = "MIT" }
 dependencies = [
     "homeassistant==2026.1.1",
-    "smbus2==0.6.0",
+    "smbus2==0.6.1",
     "colorlog==6.10.1",
 ]
 
