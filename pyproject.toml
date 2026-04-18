@@ -18,7 +18,7 @@ dev = [
     "pytest-asyncio",
     "mypy",
     "pre-commit",
-    "ruff==0.15.10",
+    "ruff==0.15.11",
 ]
 
 [tool.pytest.ini_options]
