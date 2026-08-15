@@ -6,7 +6,9 @@ from unittest.mock import MagicMock
 
 from homeassistant.components.fan import FanEntityFeature
 from homeassistant.const import STATE_UNAVAILABLE
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
+from homeassistant.helpers.restore_state import StoredState, async_get
+from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.argon_one.const import (
@@ -24,6 +26,17 @@ async def _setup_fan(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     """Set up the integration and wait for platform to load."""
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+
+
+async def _seed_last_state(
+    hass: HomeAssistant, state: str, attributes: dict[str, object]
+) -> None:
+    """Seed a stored state so the fan restores it on setup."""
+    async_get(hass).last_states[FAN_ENTITY_ID] = StoredState(
+        State(FAN_ENTITY_ID, state, attributes),
+        None,
+        dt_util.utcnow(),
+    )
 
 
 async def test_set_percentage(
@@ -351,3 +364,156 @@ async def test_turn_on_with_preset_mode(
     assert state.attributes["preset_mode"] == PRESET_SILENT
     # At 70°C on silent → 75%
     assert state.attributes["percentage"] == 75
+
+
+async def test_restore_last_state_on(
+    hass: HomeAssistant,
+    mock_config_entry_classic: MockConfigEntry,
+    mock_smbus: MagicMock,
+) -> None:
+    """Test that a previously-on fan restores its percentage and re-applies it."""
+    await _seed_last_state(hass, "on", {"percentage": 50})
+    await _setup_fan(hass, mock_config_entry_classic)
+
+    state = hass.states.get(FAN_ENTITY_ID)
+    assert state.state == "on"
+    assert state.attributes["percentage"] == 50
+    mock_smbus.write_byte.assert_called_with(I2C_ADDRESS, 50)
+
+
+async def test_restore_last_state_off(
+    hass: HomeAssistant,
+    mock_config_entry_classic: MockConfigEntry,
+    mock_smbus: MagicMock,
+) -> None:
+    """Test that a previously-off fan stays off without writing to the bus."""
+    await _seed_last_state(hass, "off", {"percentage": 0})
+    await _setup_fan(hass, mock_config_entry_classic)
+
+    state = hass.states.get(FAN_ENTITY_ID)
+    assert state.state == "off"
+    assert state.attributes["percentage"] == 0
+    mock_smbus.write_byte.assert_not_called()
+
+
+async def test_restore_last_state_pi5(
+    hass: HomeAssistant,
+    mock_config_entry_pi5: MockConfigEntry,
+    mock_smbus: MagicMock,
+) -> None:
+    """Test that restore uses the Pi 5 I2C protocol."""
+    await _seed_last_state(hass, "on", {"percentage": 75})
+    await _setup_fan(hass, mock_config_entry_pi5)
+
+    state = hass.states.get(FAN_ENTITY_ID)
+    assert state.state == "on"
+    assert state.attributes["percentage"] == 75
+    mock_smbus.write_byte_data.assert_called_with(I2C_ADDRESS, PI5_FAN_REGISTER, 75)
+    mock_smbus.write_byte.assert_not_called()
+
+
+async def test_restore_clamps_percentage(
+    hass: HomeAssistant,
+    mock_config_entry_classic: MockConfigEntry,
+    mock_smbus: MagicMock,
+) -> None:
+    """Test that restored percentage is clamped to a valid range."""
+    await _seed_last_state(hass, "on", {"percentage": 150})
+    await _setup_fan(hass, mock_config_entry_classic)
+
+    state = hass.states.get(FAN_ENTITY_ID)
+    assert state.state == "on"
+    assert state.attributes["percentage"] == 100
+    mock_smbus.write_byte.assert_called_with(I2C_ADDRESS, 100)
+
+
+async def test_no_stored_state_does_not_write(
+    hass: HomeAssistant,
+    mock_config_entry_classic: MockConfigEntry,
+    mock_smbus: MagicMock,
+) -> None:
+    """Test that fresh setup without a stored state writes nothing to the bus."""
+    await _setup_fan(hass, mock_config_entry_classic)
+
+    mock_smbus.write_byte.assert_not_called()
+
+
+async def test_restore_last_state_preset(
+    hass: HomeAssistant,
+    mock_config_entry_with_sensor: MockConfigEntry,
+    mock_smbus: MagicMock,
+) -> None:
+    """Test that an active preset is restored and re-applied."""
+    hass.states.async_set("sensor.mock_temperature", "65")
+    await _seed_last_state(
+        hass, "on", {"percentage": 60, "preset_mode": PRESET_DEFAULT}
+    )
+    await _setup_fan(hass, mock_config_entry_with_sensor)
+
+    state = hass.states.get(FAN_ENTITY_ID)
+    assert state.state == "on"
+    assert state.attributes["preset_mode"] == PRESET_DEFAULT
+    # 65°C on default curve → 60%
+    assert state.attributes["percentage"] == 60
+    mock_smbus.write_byte.assert_called_with(I2C_ADDRESS, 60)
+
+
+async def test_restore_preset_ignored_without_sensor(
+    hass: HomeAssistant,
+    mock_config_entry_classic: MockConfigEntry,
+    mock_smbus: MagicMock,
+) -> None:
+    """Test that preset is not restored without a configured sensor."""
+    await _seed_last_state(
+        hass, "on", {"percentage": 50, "preset_mode": PRESET_DEFAULT}
+    )
+    await _setup_fan(hass, mock_config_entry_classic)
+
+    state = hass.states.get(FAN_ENTITY_ID)
+    assert state.state == "on"
+    assert state.attributes["preset_mode"] is None
+    assert state.attributes["percentage"] == 50
+    mock_smbus.write_byte.assert_called_with(I2C_ADDRESS, 50)
+
+
+async def test_restore_invalid_preset_falls_back_to_percentage(
+    hass: HomeAssistant,
+    mock_config_entry_with_sensor: MockConfigEntry,
+    mock_smbus: MagicMock,
+) -> None:
+    """Test that an unknown preset falls back to restoring the percentage."""
+    hass.states.async_set("sensor.mock_temperature", "65")
+    await _seed_last_state(
+        hass, "on", {"percentage": 60, "preset_mode": "unknown_preset"}
+    )
+    await _setup_fan(hass, mock_config_entry_with_sensor)
+
+    state = hass.states.get(FAN_ENTITY_ID)
+    assert state.attributes["preset_mode"] is None
+    assert state.attributes["percentage"] == 60
+    mock_smbus.write_byte.assert_called_with(I2C_ADDRESS, 60)
+
+
+async def test_restored_preset_tracks_sensor_changes(
+    hass: HomeAssistant,
+    mock_config_entry_with_sensor: MockConfigEntry,
+    mock_smbus: MagicMock,
+) -> None:
+    """Test that a restored preset keeps tracking temperature changes."""
+    hass.states.async_set("sensor.mock_temperature", "55")
+    await _seed_last_state(
+        hass, "on", {"percentage": 25, "preset_mode": PRESET_DEFAULT}
+    )
+    await _setup_fan(hass, mock_config_entry_with_sensor)
+
+    state = hass.states.get(FAN_ENTITY_ID)
+    assert state.attributes["preset_mode"] == PRESET_DEFAULT
+    # 55°C on default curve → 25%
+    assert state.attributes["percentage"] == 25
+
+    # Temperature rises → preset recalculates speed
+    hass.states.async_set("sensor.mock_temperature", "70")
+    await hass.async_block_till_done()
+
+    state = hass.states.get(FAN_ENTITY_ID)
+    assert state.attributes["percentage"] == 80
