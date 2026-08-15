@@ -1,7 +1,7 @@
 {
     "name": "argon_one",
     "image": "mcr.microsoft.com/devcontainers/python:3.13",
-    "postCreateCommand": "scripts/setup",
+    "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh && sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libturbojpeg0 libpcap-dev && export PATH=\"$HOME/.local/bin:$PATH\" && scripts/setup",
     "forwardPorts": [
         8123
     ],
@@ -36,11 +36,5 @@
             }
         }
     },
-    "remoteUser": "vscode",
-    "features": {
-        "ghcr.io/devcontainers-extra/features/apt-packages:1": {
-            "packages": "ffmpeg,libturbojpeg0,libpcap-dev"
-        },
-        "ghcr.io/astral-sh/setup-uv:1": {}
-    }
+    "remoteUser": "vscode"
 }
