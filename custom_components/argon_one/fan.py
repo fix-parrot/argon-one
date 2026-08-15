@@ -5,9 +5,15 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.fan import FanEntity, FanEntityFeature
-from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.components.fan import (
+    ATTR_PERCENTAGE,
+    ATTR_PRESET_MODE,
+    FanEntity,
+    FanEntityFeature,
+)
+from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.restore_state import RestoreEntity
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -42,7 +48,7 @@ async def async_setup_entry(
     async_add_entities([ArgonOneFan(entry)])
 
 
-class ArgonOneFan(FanEntity):
+class ArgonOneFan(FanEntity, RestoreEntity):
     """Argon ONE case fan."""
 
     _attr_has_entity_name = True
@@ -81,6 +87,32 @@ class ArgonOneFan(FanEntity):
                 else "Argon ONE Classic (Pi 3/4)"
             ),
         }
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the last known fan state after a restart."""
+        await super().async_added_to_hass()
+        if (last_state := await self.async_get_last_state()) is None:
+            return
+
+        self._is_on = last_state.state == STATE_ON
+        percentage = last_state.attributes.get(ATTR_PERCENTAGE)
+        if isinstance(percentage, int):
+            # Clamp restored speed to a valid range.
+            self._percentage = min(100, max(0, percentage))
+
+        preset_mode = last_state.attributes.get(ATTR_PRESET_MODE)
+        if self._temp_sensor_entity_id is not None and preset_mode in PRESET_CURVES:
+            # Restore the active preset: recompute the speed from the sensor
+            # and re-subscribe so the curve keeps tracking temperature.
+            self._preset_mode = preset_mode
+            self._subscribe_sensor()
+            await self._async_apply_preset()
+            return
+
+        # No preset (or no sensor configured): since the device is write-only,
+        # re-apply the speed so the hardware matches the restored state.
+        if self._is_on and self._percentage is not None:
+            await self._async_send_speed(self._percentage)
 
     @property
     def is_on(self) -> bool:
