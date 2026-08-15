@@ -33,6 +33,9 @@ home-assistant_v2.db
 htmlcov/
 coverage.xml
 
+# Type checking
+.mypy_cache/
+
 # Build artifacts
 *.egg-info/
 dist/
