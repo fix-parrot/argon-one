@@ -46,6 +46,7 @@ build/
 *.tmp
 .cache/
 .ruff_cache
+.temp/
 
 # OS
 Thumbs.db
